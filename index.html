@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>タスク管理アプリ</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .calendar-grid { display: flex; flex-direction: column; gap: 2px; }
+    .row { display: flex; }
+    .calendar-day { width: 40px; height: 40px; border: 1px solid #ccc; text-align: center; line-height: 40px; box-sizing: border-box; }
+  </style>
+</head>
+
+<body>
+  <!-- ①メイン画面 -->
+  <div id="screen1" class="screen active">
+    <div class="header">
+      <div class="status" id="taskStatus">現在：0/0 タスク完了</div>
+      <button class="btn btn-calendar" onclick="showCalendar()">カレンダーを表示</button>
+    </div>
+    <div class="task-section">
+      <h3>現在進行中のタスク</h3>
+      <div id="activeTaskList"></div>
+    </div>
+    <div class="task-section">
+      <div class="section-header">
+        <h3>達成済み・時間切れタスク</h3>
+        <button class="btn btn-danger btn-small" id="bulkDeleteBtn" onclick="bulkDeleteFinishedTasks()" style="display: none;">一括削除</button>
+      </div>
+      <div id="finishedTaskList"></div>
+    </div>
+    <button class="add-button" onclick="showAddMenu()">+</button>
+  </div>
+
+  <!-- ②入力画面 -->
+  <div id="screen2" class="screen">
+    <div class="button-group-top">
+      <button class="btn btn-secondary" onclick="goToMain()">戻る</button>
+      <button class="btn btn-danger" id="deleteBtn" style="display:none;" onclick="deleteTask()">予定を削除</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveTask()">追加</button>
+    </div>
+    <div class="form-group">
+      <label for="taskName">名前</label>
+      <input type="text" id="taskName" placeholder="タスク名を入力">
+    </div>
+    <div class="form-group">
+      <label>期限</label>
+      <div class="date-time-row">
+        <div class="date-time-group">
+          <input type="date" id="startDate">
+          <input type="time" id="startTime">
+        </div>
+        <span class="from-to">から</span>
+        <div class="date-time-group">
+          <input type="date" id="endDate">
+          <input type="time" id="endTime">
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="taskComment">コメント</label>
+      <textarea id="taskComment" placeholder="コメントを入力"></textarea>
+    </div>
+  </div>
+
+  <!-- ③編集画面 -->
+  <div id="screen3" class="screen">
+    <div class="edit-buttons">
+      <button class="btn btn-primary btn-large" onclick="editTask()">タスクを編集</button>
+      <button class="btn btn-primary btn-large" onclick="completeTask()">タスク終了！！</button>
+      <button class="btn btn-secondary btn-large" onclick="goToMain()">戻る</button>
+    </div>
+  </div>
+
+  <!-- ④カレンダー画面 -->
+  <div id="screen4" class="screen">
+    <div class="calendar-header">
+      <button class="btn btn-secondary" onclick="goToMain()">リストに戻る</button>
+      <div class="month-navigation">
+        <button class="btn btn-small" onclick="changeMonth(-1)">←</button>
+        <span id="currentMonth"></span>
+        <button class="btn btn-small" onclick="changeMonth(1)">→</button>
+      </div>
+    </div>
+    <div class="calendar-grid" id="calendarGrid"></div>
+    <button class="add-button" onclick="showAddMenu()">+</button>
+  </div>
+
+  <!-- 完了ポップアップ -->
+  <div id="completionPopup" class="popup" style="display:none;">
+    <div class="popup-content">
+      <h3>課題が完了しました！！やったね！！</h3>
+      <button class="btn btn-primary" onclick="closePopup()">OK</button>
+    </div>
+  </div>
+
+  <!-- ⑤AIチャット画面 -->
+  <div id="screen5" class="screen">
+    <div class="button-group-top">
+      <button class="btn btn-secondary" onclick="goToMain()">戻る</button>
+    </div>
+    <div class="chat-container" id="chatContainer"></div>
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="AIに相談しよう">
+      <button class="btn btn-primary" onclick="sendChat()">送信</button>
+    </div>
+  </div>
+
+  <!-- ⑥規則的に設定画面 -->
+  <div id="screen6" class="screen">
+    <div class="button-group-top">
+      <button class="btn btn-secondary" onclick="goToMain()">戻る</button>
+      <button class="btn btn-primary" onclick="saveRegularTask()">追加</button>
+    </div>
+    <div class="form-group">
+      <label for="regularTaskName">タスク名</label>
+      <input type="text" id="regularTaskName" placeholder="タスク名を入力">
+    </div>
+    <div class="form-group">
+      <label>曜日を選択</label>
+      <div id="weekdayCheckboxes">
+        <label><input type="checkbox" value="0">日</label>
+        <label><input type="checkbox" value="1">月</label>
+        <label><input type="checkbox" value="2">火</label>
+        <label><input type="checkbox" value="3">水</label>
+        <label><input type="checkbox" value="4">木</label>
+        <label><input type="checkbox" value="5">金</label>
+        <label><input type="checkbox" value="6">土</label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="regularTaskTime">開始時刻</label>
+      <input type="time" id="regularTaskTime">
+    </div>
+    <div class="form-group">
+      <label for="regularTaskComment">コメント</label>
+      <textarea id="regularTaskComment"></textarea>
+    </div>
+  </div>
+
+  <!-- 追加ボタンのメニュー -->
+  <div id="addMenu" class="popup" style="display:none;">
+    <div class="popup-content">
+      <button class="btn btn-primary" onclick="showChatScreen()">AIに相談</button>
+      <button class="btn btn-primary" onclick="showAddScreen()">タスク追加</button>
+      <button class="btn btn-primary" onclick="showRegularScreen()">規則的に設定</button>
+      <button class="btn btn-secondary" onclick="closeAddMenu()">キャンセル</button>
+    </div>
+  </div>
+
+  <!-- ツールチップ -->
+  <div id="tooltip" class="tooltip"></div>
+
+  <!-- ...（あなたのHTMLそのまま）... -->
+  <!-- （省略、body内はあなたのHTMLをそのまま使ってOK） -->
+
+  <script type="module">
+    // Firebaseのimport
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getFirestore } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    // Firebase初期化
+    const firebaseConfig = {
+      apiKey: "AIzaSyAeRkuiK1cg7qNJOHNZV1qvfMCJKFFXrsw",
+      authDomain: "dev29fdev17-e4c68.firebaseapp.com",
+      projectId: "dev29fdev17-e4c68",
+      storageBucket: "dev29fdev17-e4c68.firebasestorage.app",
+      messagingSenderId: "314399770699",
+      appId: "1:314399770699:web:aabbc880030dea734a65ce"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // アプリ本体
+    let tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+    let currentTaskId = null;
+    let editingTaskId = null;
+    let currentDate = new Date();
+
+    function saveTasks() {
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+    }
+
+    function createTaskElement(task, container, isFinished) {
+      const div = document.createElement('div');
+      div.className = isFinished ? 'task finished' : 'task active';
+      div.textContent = `${task.name} (${task.startDateTime?.replace('T',' ')}〜${task.endDateTime?.replace('T',' ')})`;
+      div.onclick = function() {
+        currentTaskId = task.id;
+        editTask();
+      };
+      container.appendChild(div);
+    }
+
+    function updateMainScreen() {
+      const activeTaskList = document.getElementById('activeTaskList');
+      const finishedTaskList = document.getElementById('finishedTaskList');
+      const taskStatus = document.getElementById('taskStatus');
+      const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+      const now = new Date();
+      const activeTasks = [];
+      const finishedTasks = [];
+      tasks.forEach(task => {
+        const endDate = new Date(task.endDateTime);
+        if (task.completed || endDate < now) {
+          finishedTasks.push(task);
+        } else {
+          activeTasks.push(task);
+        }
+      });
+      activeTasks.sort((a, b) => new Date(a.endDateTime) - new Date(b.endDateTime));
+      finishedTasks.sort((a, b) => new Date(b.endDateTime) - new Date(a.endDateTime));
+      const completedTasks = tasks.filter(task => task.completed);
+      taskStatus.textContent = `現在：${completedTasks.length}/${tasks.length} タスク完了`;
+      activeTaskList.innerHTML = '';
+      activeTasks.forEach(task => createTaskElement(task, activeTaskList, false));
+      finishedTaskList.innerHTML = '';
+      finishedTasks.forEach(task => createTaskElement(task, finishedTaskList, true));
+      bulkDeleteBtn.style.display = finishedTasks.length > 0 ? 'block' : 'none';
+    }
+
+    function showAddMenu() {
+      document.getElementById('addMenu').style.display = 'block';
+    }
+    function closeAddMenu() {
+      document.getElementById('addMenu').style.display = 'none';
+    }
+    function showCalendar() {
+      showScreen('screen4');
+      updateCalendar();
+    }
+    function showAddScreen() {
+      editingTaskId = null;
+      document.getElementById('taskName').value = '';
+      document.getElementById('startDate').value = '';
+      document.getElementById('startTime').value = '';
+      document.getElementById('endDate').value = '';
+      document.getElementById('endTime').value = '';
+      document.getElementById('taskComment').value = '';
+      document.getElementById('deleteBtn').style.display = 'none';
+      document.getElementById('saveBtn').textContent = '追加';
+      showScreen('screen2');
+    }
+    function saveTask() {
+      const name = document.getElementById('taskName').value;
+      const startDate = document.getElementById('startDate').value;
+      const startTime = document.getElementById('startTime').value;
+      const endDate = document.getElementById('endDate').value;
+      const endTime = document.getElementById('endTime').value;
+      const comment = document.getElementById('taskComment').value;
+      if (!name || !startDate || !startTime || !endDate || !endTime) {
+        alert('すべて入力してください');
+        return;
+      }
+      const startDateTime = new Date(`${startDate}T${startTime}`);
+      const endDateTime = new Date(`${endDate}T${endTime}`);
+      if (startDateTime >= endDateTime) {
+        alert('終了時刻は開始時刻より後に設定してください');
+        return;
+      }
+      if (editingTaskId) {
+        const task = tasks.find(t => t.id === editingTaskId);
+        task.name = name;
+        task.startDateTime = startDateTime.toISOString();
+        task.endDateTime = endDateTime.toISOString();
+        task.comment = comment;
+      } else {
+        const newTask = {
+          id: Date.now(),
+          name: name,
+          startDateTime: startDateTime.toISOString(),
+          endDateTime: endDateTime.toISOString(),
+          comment: comment,
+          completed: false
+        };
+        tasks.push(newTask);
+      }
+      saveTasks();
+      goToMain();
+    }
+    function deleteTask() {
+      if (confirm('本当に削除しますか？')) {
+        tasks = tasks.filter(t => t.id !== editingTaskId);
+        saveTasks();
+        goToMain();
+      }
+    }
+    function editTask() {
+      const task = tasks.find(t => t.id === currentTaskId);
+      if (task) {
+        editingTaskId = task.id;
+        const startDate = new Date(task.startDateTime);
+        const endDate = new Date(task.endDateTime);
+        document.getElementById('taskName').value = task.name;
+        document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+        document.getElementById('startTime').value = startDate.toTimeString().slice(0, 5);
+        document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+        document.getElementById('endTime').value = endDate.toTimeString().slice(0, 5);
+        document.getElementById('taskComment').value = task.comment || '';
+        document.getElementById('deleteBtn').style.display = 'block';
+        document.getElementById('saveBtn').textContent = '更新';
+        showScreen('screen2');
+      }
+    }
+    function completeTask() {
+      const task = tasks.find(t => t.id === currentTaskId);
+      if (task) {
+        task.completed = true;
+        saveTasks();
+        showPopup();
+      }
+    }
+    function goToMain() {
+      showScreen('screen1');
+      updateMainScreen();
+    }
+    function closePopup() {
+      document.getElementById('completionPopup').style.display = 'none';
+      goToMain();
+    }
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active');
+      });
+      const target = document.getElementById(screenId);
+      if (target) {
+        target.classList.add('active');
+      }
+    }
+    function changeMonth(direction) {
+      currentDate.setMonth(currentDate.getMonth() + direction);
+      updateCalendar();
+    }
+    function updateCalendar() {
+      const grid = document.getElementById('calendarGrid');
+      grid.innerHTML = '';
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      document.getElementById('currentMonth').textContent = `${year}年${month + 1}月`;
+      const days = ['日','月','火','水','木','金','土'];
+      let header = document.createElement('div');
+      header.className = 'row';
+      days.forEach(d => {
+        let cell = document.createElement('div');
+        cell.className = 'calendar-day';
+        cell.textContent = d;
+        header.appendChild(cell);
+      });
+      grid.appendChild(header);
+      let row = document.createElement('div');
+      row.className = 'row';
+      for (let i = 0; i < firstDay.getDay(); i++) {
+        let cell = document.createElement('div');
+        cell.className = 'calendar-day';
+        row.appendChild(cell);
+      }
+      for (let d = 1; d <= lastDay.getDate(); d++) {
+        if (row.children.length === 7) {
+          grid.appendChild(row);
+          row = document.createElement('div');
+          row.className = 'row';
+        }
+        let cell = document.createElement('div');
+        cell.className = 'calendar-day';
+        cell.textContent = d;
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        if (tasks.some(t => t.startDateTime && t.startDateTime.startsWith(dateStr))) {
+          cell.style.background = '#ffe';
+        }
+        row.appendChild(cell);
+      }
+      grid.appendChild(row);
+    }
+    function showChatScreen() {
+      closeAddMenu();
+      showScreen('screen5');
+      document.getElementById('chatContainer').innerHTML = '';
+    }
+    function showRegularScreen() {
+      closeAddMenu();
+      showScreen('screen6');
+      document.getElementById('regularTaskName').value = '';
+      document.getElementById('regularTaskTime').value = '';
+      document.getElementById('regularTaskComment').value = '';
+      document.querySelectorAll('#weekdayCheckboxes input').forEach(cb => cb.checked = false);
+    }
+    function sendChat() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+      appendChatMessage('user', text);
+      input.value = '';
+      appendChatMessage('ai', '（AI応答のダミーです）');
+    }
+    function appendChatMessage(sender, text) {
+      const chatContainer = document.getElementById('chatContainer');
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `chat-message ${sender}`;
+      msgDiv.textContent = text;
+      chatContainer.appendChild(msgDiv);
+    }
+    function saveRegularTask() {
+      alert('規則的タスク追加（ダミー）');
+      goToMain();
+    }
+
+    // window登録
+    window.showAddMenu = showAddMenu;
+    window.closeAddMenu = closeAddMenu;
+    window.showCalendar = showCalendar;
+    window.showAddScreen = showAddScreen;
+    window.showChatScreen = showChatScreen;
+    window.showRegularScreen = showRegularScreen;
+    window.bulkDeleteFinishedTasks = function(){}; // 必要に応じて実装
+    window.goToMain = goToMain;
+    window.saveTask = saveTask;
+    window.deleteTask = deleteTask;
+    window.editTask = editTask;
+    window.completeTask = completeTask;
+    window.sendChat = sendChat;
+    window.saveRegularTask = saveRegularTask;
+    window.changeMonth = changeMonth;
+    window.closePopup = closePopup;
+
+    // 初期化
+    window.onload = () => {
+      updateMainScreen();
+    };
+  </script>
+</body>
+</html>
